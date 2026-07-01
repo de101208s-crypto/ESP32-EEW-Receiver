@@ -982,6 +982,36 @@ CANCEL
 * ユニバーサル基板化
 
 ---
+
+# ⚠ Test Mode
+
+動作確認を行う場合は、EEW APIのURLを試験用JSONへ変更してください。
+
+## Test URL
+
+試験用URL：
+
+https://gist.githubusercontent.com/de101208s-crypto/04a6cbb61195e48dd94d884c9ffc6f67/raw/63e5e4ebd5723a758ad7912310dad6d9653871f5/test.json
+
+コード内の以下の部分を書き換えます。
+
+const char* url =
+"試験用URL";
+
+試験用URLへ変更すると、実際の地震を待たずにEEW表示・LED・ブザーなどの動作確認ができます。
+
+##  Important
+
+試験終了後は、必ず通常のAPI URLへ戻してください。
+
+通常運用時のURL：
+
+https://api.wolfx.jp/jma_eew.json
+
+試験用URLのままでは、実際の緊急地震速報を受信できません。
+
+動作確認後は、通常のAPI URLへ戻してからESP32へ再度書き込んでください。
+
 # Known Issues
 
 現在確認されている問題です。
