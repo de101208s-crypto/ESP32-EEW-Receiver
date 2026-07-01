@@ -891,6 +891,10 @@ IWO     M6.9
 
 # GS Code Examples
 
+## Screenshots
+
+![Receiver](IMG_1833.png)
+
 | Hypocenter | GS  |
 | ---------- | --- |
 | 根室半島南東沖    | NMU |
