@@ -4,7 +4,7 @@ ESP32とOLEDディスプレイを使用した、緊急地震速報（EEW）受�
 
 ## Screenshots
 
-![Receiver](IMG_1799.jpg)
+![Receiver](IMG_1799.jpeg)
 
 本機はWi-Fi経由でEEW情報を取得し、OLEDディスプレイへリアルタイムに表示します。警報時にはLEDとブザーで通知を行い、速報番号・最大予測震度・マグニチュード・震源GSコードなどを確認できます。
 
