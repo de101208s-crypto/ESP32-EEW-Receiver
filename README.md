@@ -2,687 +2,1105 @@
 
 ESP32とOLEDディスプレイを使用した、緊急地震速報（EEW）受信モニターです。
 
-Wi-Fi経由でEEWデータを取得し、震源情報・最大予測震度・マグニチュードなどをOLEDへ表示します。
+本機はWi-Fi経由でEEW情報を取得し、OLEDディスプレイへリアルタイムに表示します。警報時にはLEDとブザーで通知を行い、速報番号・最大予測震度・マグニチュード・震源GSコードなどを確認できます。
 
-LEDとブザーによる警報通知、速報更新管理、PLUM法表示、最終報処理、キャンセル処理に対応しています。
+本プロジェクトは電子工作・防災・地震観測を目的とした個人製作のEEW受信機です。
 
-※本機は公式の緊急地震速報端末ではありません。
-防災判断には気象庁など公式情報をご利用ください。
+> **⚠ Notice**
+> この受信機は個人製作です。公式な緊急地震速報受信装置ではありません。防災判断には必ず気象庁などの公式情報をご利用ください。
 
 ---
 
 # Features
 
-## Main Features
-
-- 緊急地震速報（EEW）受信
-- Wi-Fiによる自動データ取得
-- OLEDリアルタイム表示
-- 最大予測震度表示
-- マグニチュード表示
-- 震源GSコード表示
-- LED警報表示
-- ブザー警報
-- PLUM法対応
-- FINAL報対応
-- キャンセル報対応
-- EEW更新管理
-- 全国震源GSコード変換
-
----
-
-# System Overview
-
-この受信機は以下の流れで動作します。
-
-Wolfx JMA EEW API
-|
-↓
-ESP32 Wi-Fi通信
-|
-↓
-JSONデータ解析
-|
-↓
-EEW情報判定
-|
-↓
-OLED表示
-|
-↓
-LED・ブザー警報
-
+* ESP32によるWi-Fi通信
+* Wolfx JMA EEW API対応
+* SSD1306 OLED（128×64）表示
+* 約1秒間隔でEEW情報を取得
+* 最大予測震度表示
+* マグニチュード表示
+* 震源GSコード表示
+* PLUM対応
+* FINAL報対応
+* キャンセル報対応
+* EventID・Serialによる速報管理
+* LED警報
+* パッシブブザー警報
+* 全国震源GSコード対応
 
 ---
 
 # Hardware
 
-## 使用部品
+## Used Parts
 
-|部品|型番・製品名|用途|
-|-|-|-|
-|ESP32開発ボード|Freenove ESP32 Dev Board Kit|制御・Wi-Fi通信|
-|OLEDディスプレイ|ARCELIS SSD1306 0.96インチ OLED|情報表示|
-|LED|ELPA LED 5mm HK-LED5H|警報表示|
-|ブザー|電磁パッシブブザー 16Ω|警報音出力|
-|ブレッドボード|一般的なブレッドボード|試作|
-|ジャンパーワイヤ|ジャンパーワイヤ|配線|
-|USBケーブル|ESP32用USBケーブル|給電・書き込み|
+| Part              | Product                            |
+| ----------------- | ---------------------------------- |
+| Development Board | Freenove ESP32 Dev Board Kit       |
+| OLED Display      | ARCELIS SSD1306 0.96 inch OLED     |
+| LED               | ELPA HK-LED5H (5mm)                |
+| Buzzer            | 16Ω Passive Electromagnetic Buzzer |
+| Breadboard        | Standard Breadboard                |
+| Jumper Wires      | Male-Male Jumper Wires             |
+| USB Cable         | USB Cable for ESP32                |
 
 ---
 
+# Specifications
+
+| Item            | Description                 |
+| --------------- | --------------------------- |
+| MCU             | ESP32                       |
+| Display         | SSD1306 OLED 128×64         |
+| Communication   | Wi-Fi                       |
+| Power           | USB 5V                      |
+| Update Interval | About 1 second              |
+| Data Source     | Wolfx JMA EEW API           |
+| Development     | Arduino IDE / Arduino Cloud |
+
+---
+
+# Overview
+
+本機は以下の流れで動作します。
+
+```text
+Wolfx JMA EEW API
+        │
+        ▼
+ESP32 Wi-Fi Communication
+        │
+        ▼
+JSON Data Analysis
+        │
+        ▼
+EEW Processing
+        │
+        ▼
+OLED Display
+        │
+        ▼
+LED & Buzzer Alert
+```
+
+---
+
+# Main Functions
+
+## Normal Standby
+
+Wi-Fi接続後、約1秒間隔でEEW情報を取得します。
+
+表示例
+
+```text
+WiFi OK
+
+Waiting...
+```
+
+---
+
+## EEW Reception
+
+EEWを受信すると、
+
+* 速報番号
+* 最大予測震度
+* 震源GSコード
+* マグニチュード
+
+をOLEDへ表示します。
+
+表示例
+
+```text
+EEW!#12
+
+6+
+IWO   M6.9
+```
+
+---
+
+## Alert
+
+警報対象のEEWを受信した場合、
+
+* LED点灯
+* ブザー警報
+
+を自動で実行します。
+
+---
+
+## Automatic Update
+
+速報番号（Serial）が更新されるたびに表示内容も自動更新されます。
+
+新しい地震（EventID変更）の場合も自動で切り替わります。
+
+---
 # Wiring
 
-## OLED（I2C）
+## Connection Diagram
 
-OLEDはI2C通信で接続します。
+```text
+                    OLED SSD1306
+              ┌──────────────────┐
+              │ VCC GND SCL SDA │
+              └─┬───┬───┬───┬────┘
+                │   │   │   │
+                │   │   │   └──────── GPIO21 (SDA)
+                │   │   └──────────── GPIO22 (SCL)
+                │   └──────────────── GND
+                └──────────────────── 3.3V
 
-|OLED|ESP32|
-|-|-|
-|VCC|3.3V|
-|GND|GND|
-|SDA|GPIO21|
-|SCL|GPIO22|
+                      ESP32 Dev Board
+        ┌─────────────────────────────────────┐
+        │                                     │
+3.3V ───┤ 3V3                                 │
+GND  ───┤ GND                                 │
+SDA  ───┤ GPIO21 (SDA)                        │
+SCL  ───┤ GPIO22 (SCL)                        │
+LED  ───┤ GPIO16 ─────► LED (+)               │
+BZ   ───┤ GPIO17 ─────► Passive Buzzer (+)    │
+        │                                     │
+        └─────────────────────────────────────┘
+                         │
+                         │
+                    Common GND
+```
 
 ---
 
-## LED
+## Connection Table
 
-|LED|ESP32|
-|-|-|
-|アノード（＋）|GPIO16|
-|カソード（−）|GND|
-
-※LEDには電流制限用抵抗を使用してください。
+| ESP32 Pin | Connect To              |
+| --------- | ----------------------- |
+| 3.3V      | OLED VCC                |
+| GND       | OLED GND                |
+| GND       | LED (-)                 |
+| GND       | Passive Buzzer (-)      |
+| GPIO21    | OLED SDA                |
+| GPIO22    | OLED SCL                |
+| GPIO16    | LED (+) ※220Ω～330Ω抵抗を推奨 |
+| GPIO17    | Passive Buzzer (+)      |
 
 ---
 
-## Buzzer
+## Wiring Notes
 
-|ブザー|ESP32|
-|-|-|
-|＋|GPIO17|
-|−|GND|
+* OLEDはI2C通信を使用します。
+* LEDには220Ω～330Ω程度の電流制限抵抗を使用してください。
+* すべてのGNDは共通に接続してください。
+* GPIO16はLED、GPIO17はパッシブブザー専用です。
 
 ---
 
 # Assembly
 
-## 組み立て手順
+## Required Tools
 
-1. ESP32開発ボードをブレッドボードへ取り付けます。
+* はんだ付け不要（ブレッドボードで動作）
+* USBケーブル
+* パソコン
+* Arduino IDE または Arduino Cloud
 
-2. OLEDをGPIO21・GPIO22へ接続します。
+---
 
-3. LEDをGPIO16へ接続します。
+## Assembly Procedure
 
-4. ブザーをGPIO17へ接続します。
+### 1. ESP32をブレッドボードへ取り付けます。
 
-5. 配線を確認します。
+---
 
-6. USBケーブルでESP32へ電源を供給します。
+### 2. OLEDを接続します。
+
+接続先
+
+* VCC → 3.3V
+* GND → GND
+* SDA → GPIO21
+* SCL → GPIO22
+
+---
+
+### 3. LEDを接続します。
+
+GPIO16から220Ω～330Ω程度の抵抗を経由してLEDのアノード（＋）へ接続します。
+
+LEDのカソード（－）はGNDへ接続します。
+
+---
+
+### 4. ブザーを接続します。
+
+ブザー（＋）をGPIO17へ接続します。
+
+ブザー（－）はGNDへ接続します。
+
+---
+
+### 5. USBケーブルを接続します。
+
+ESP32へUSBケーブルを接続すると起動します。
 
 ---
 
 # Software
 
-## 開発環境
+## Supported Environment
 
-以下の環境で開発できます。
+本プロジェクトは以下で開発できます。
 
-- Arduino IDE
-- Arduino Cloud
-
-ESP32ボード環境をインストールしてください。
+* Arduino IDE
+* Arduino Cloud
 
 ---
 
-# Required Libraries
+## Required Libraries
 
-必要なライブラリ：
+以下のライブラリをインストールしてください。
 
+### Arduino Library Manager
 
-Adafruit GFX Library
-Adafruit SSD1306
-ArduinoJson
-
-
-標準搭載ライブラリ：
-
-
-WiFi
-WiFiClientSecure
-HTTPClient
-Wire
-
+* Adafruit GFX Library
+* Adafruit SSD1306
+* ArduinoJson
 
 ---
 
-# Setup
+### Standard Libraries
 
-## Wi-Fi設定
+ESP32環境に含まれています。
 
-プログラム内の以下を変更してください。
-```cpp
-const char* ssid = "SSID";
-const char* password = "PASSWORD";
-変更後、ESP32へ書き込みます。
+* WiFi
+* WiFiClientSecure
+* HTTPClient
+* Wire
 
-Initial Boot
+---
 
-ESP32起動後、初期表示を行います。
+# First Boot
 
-表示：
+起動すると以下の画面が表示されます。
 
+```text
 BOOT
+```
 
-その後Wi-Fi接続を開始します。
+その後、自動でWi-Fiへ接続します。
 
-Wi-Fi接続成功
+接続成功すると、
 
-表示：
-
+```text
 WiFi OK
 
 Waiting...
+```
 
-この状態でEEW情報を待機します。
+が表示され、EEW情報の取得を開始します。
 
-Wi-Fi接続失敗
+Wi-Fiへ接続できない場合は、
 
-表示：
-
+```text
 NO WIFI
+```
 
-Wi-Fiが復旧するまで再接続処理を行います。
-
-Data Source
-
-使用API：
-
-https://api.wolfx.jp/jma_eew.json
-
-取得したJSONデータを解析して表示します。
-
-取得項目：
-
-項目	用途
-EventID	地震イベント識別
-Serial	速報番号
-Hypocenter	震源地
-MaxIntensity	最大予測震度
-Magnitude	マグニチュード
-isWarn	警報判定
-isFinal	最終報判定
-isCancel	キャンセル判定
-isAssumption	PLUM判定
-# EEW Processing Details
-
-本機は約1秒間隔でEEW APIを確認し、最新の緊急地震速報情報を取得します。
-
-取得したJSONデータを解析し、必要な情報を抽出して表示・警報処理を行います。
+を表示し、接続を再試行します。
 
 ---
+# Wi-Fi Configuration
 
-# EEW Data Flow
+初回使用前に、ESP32を使用するWi-Fiへ接続できるよう設定してください。
 
-EEW受信時の処理：
-
-
-EEW JSON取得
-|
-↓
-データ解析
-|
-↓
-EventID確認
-|
-↓
-Serial確認
-|
-↓
-更新判定
-|
-↓
-表示更新
-|
-↓
-警報判定
-
-
----
-
-# EventID and Serial Management
-
-緊急地震速報は、1つの地震について複数回更新されます。
-
-例：
-
-
-EventID: 123456
-
-Serial 1
-↓
-Serial 2
-↓
-Serial 3
-↓
-Final
-
-
-本機では以下の変数を使用して管理します。
+スケッチ内の以下の部分を書き換えます。
 
 ```cpp
-lastEventID
-lastSerial
-EventID判定
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+```
 
-EventIDが変化した場合：
+## Example
 
-新しい地震
+```cpp
+const char* ssid = "HomeWiFi";
+const char* password = "password123";
+```
 
-として処理します。
+Wi-Fi設定を書き換えた後、ESP32へスケッチを書き込んでください。
 
-例：
+> **⚠ Security**
+>
+> GitHubへ公開する場合は、自分のSSIDやパスワードを書いたまま公開しないでください。
 
-123456
+---
+
+# Upload
+
+Arduino IDEまたはArduino CloudでESP32へスケッチを書き込みます。
+
+## Arduino IDE
+
+1. ESP32ボードパッケージをインストール
+2. ESP32 Dev Moduleを選択
+3. COMポートを選択
+4. 書き込み（Upload）を実行
+
+書き込み完了後、自動的にESP32が起動します。
+
+---
+
+# Internet Connection
+
+起動後の動作
+
+```text
+Power ON
+     │
+     ▼
+Wi-Fi Connection
+     │
+     ▼
+HTTPS Connection
+     │
+     ▼
+Wolfx API
+     │
+     ▼
+JSON Download
+```
+
+約1秒ごとにEEW情報を取得します。
+
+---
+
+# Data Source
+
+本プロジェクトでは以下のAPIを使用しています。
+
+```text
+https://api.wolfx.jp/jma_eew.json
+```
+
+取得したJSONデータをESP32で解析し、OLEDへ表示しています。
+
+---
+
+# Retrieved Data
+
+主に以下のデータを使用しています。
+
+| JSON Item    | Description |
+| ------------ | ----------- |
+| EventID      | 地震イベントID    |
+| Serial       | 速報番号        |
+| Hypocenter   | 震源名         |
+| Magnitude    | マグニチュード     |
+| MaxIntensity | 最大予測震度      |
+| isWarn       | 警報かどうか      |
+| isFinal      | 最終報かどうか     |
+| isAssumption | PLUM報かどうか   |
+| isCancel     | キャンセル報かどうか  |
+| WarnArea     | 警報対象地域      |
+
+---
+
+# JSON Processing
+
+取得したJSONデータはESP32内部で解析されます。
+
+処理の流れ
+
+```text
+HTTPS Download
+       │
+       ▼
+JSON Parse
+       │
+       ▼
+Read Each Item
+       │
+       ▼
+EEW Processing
+       │
+       ▼
+OLED Update
+```
+
+ArduinoJsonライブラリを使用して各項目を読み取っています。
+
+---
+
+# Update Interval
+
+通常時は約1秒ごとにAPIへアクセスし、新しいEEW情報を確認します。
+
+新しい速報が発表されると、自動的に表示内容が更新されます。
+
+通信に失敗した場合は、次回の取得タイミングで再度アクセスを行います。
+
+---
+
+# Displayed Information
+
+EEW受信時には以下の情報を表示します。
+
+* EEW種別（通常・PLUM・FINAL）
+* 速報番号（Serial）
+* 最大予測震度
+* 震源GSコード
+* マグニチュード
+
+表示例
+
+```text
+EEW!#18
+
+5+
+SAN   M7.1
+```
+
+---
+# EEW Processing
+
+本機は約1秒ごとにWolfx JMA EEW APIへアクセスし、新しい緊急地震速報（EEW）が発表されているか確認します。
+
+取得したJSONデータはESP32内部で解析され、速報の種類や更新状況を判定します。
+
+---
+
+# Processing Flow
+
+```text id="apv0f9"
+Power ON
+    │
+    ▼
+Wi-Fi Connection
+    │
+    ▼
+HTTPS Access
+    │
+    ▼
+Download JSON
+    │
+    ▼
+Parse JSON
+    │
+    ▼
+Read EventID
+Read Serial
+Read Hypocenter
+Read Intensity
+Read Magnitude
+Read Flags
+    │
+    ▼
+Determine Update
+    │
+    ▼
+OLED Update
+    │
+    ▼
+LED / Buzzer Alert
+```
+
+---
+
+# Event Management
+
+本機では同じEEWを何度も処理しないように、
+
+* EventID
+* Serial
+
+の2つを使用して管理しています。
+
+---
+
+## EventID
+
+EventIDは地震ごとに割り当てられる識別番号です。
+
+例
+
+```text id="zj1khm"
+20260701123456
+```
+
+新しいEventIDを受信した場合は、
+
+* 新しい地震
+
+として認識します。
+
+---
+
+## Serial
+
+Serialは速報番号です。
+
+例
+
+```text id="z9n1ye"
+EEW#1
 ↓
-123457
 
-新規EEWとして認識します。
-
-Serial判定
-
-同じ地震でも速報番号が増加した場合：
-
-続報
-
-として処理します。
-
-例：
-
-Serial 5
+EEW#2
 ↓
-Serial 6
 
-情報更新として認識します。
+EEW#3
+↓
 
-EEW Display
+FINAL#4
+```
 
-EEWを受信するとOLEDへ情報を表示します。
+速報番号が増えるたびに表示内容を更新します。
 
-表示例：
+---
 
-EEW!#25
+# Duplicate Prevention
 
-6+
-IWO     M6.9
-Display Format
-1行目
+内部では
 
-速報種類とSerial番号を表示します。
+* lastEventID
+* lastSerial
 
-通常速報
+を保存しています。
 
-表示：
+受信した情報と比較し、
 
-EEW!#25
+* 新しい地震
+* 続報
+
+のみを処理します。
+
+同じ速報を何度も表示することはありません。
+
+---
+
+# EEW Types
+
+本機では3種類のEEWを判定しています。
+
+---
+
+## Normal EEW
 
 通常の緊急地震速報です。
 
-PLUM情報
+表示例
 
-表示：
+```text id="tbr2zc"
+EEW!#12
+```
 
-PLUM#25
+---
 
-PLUM法による情報の場合に表示します。
+## PLUM
 
-最終報
+PLUM法による速報です。
 
-表示：
+JSONの
 
-FINAL#25
+```text id="2uz2mg"
+isAssumption
+```
 
-最終的な解析結果の場合に表示します。
+を利用して判定します。
 
-Intensity Display
+表示例
 
-気象庁の震度表記をOLED表示用に変換します。
+```text id="u4bjlwm"
+PLUM#12
+```
 
-気象庁表記	表示
-5弱	5-
-5強	5+
-6弱	6-
-6強	6+
-表示できない場合
+---
 
-以下の場合：
+## FINAL
 
-データなし
-不明
-対象なし
+最終報です。
 
-表示：
+JSONの
 
-?
+```text id="a1r7uw"
+isFinal
+```
 
-になります。
+を利用して判定します。
 
-Magnitude Display
+表示例
 
-マグニチュードを表示します。
+```text id="xv52t2"
+FINAL#12
+```
 
-例：
+最終報受信後も内容は保持され、その後待機画面へ戻ります。
 
-M6.9
+---
 
-取得できない場合：
+# Alert Processing
 
-M?
+LED・ブザーは以下の条件で動作します。
 
-になります。
+```text id="xknkqh"
+新しいEEW
+        または
+速報更新
+        ＋
+警報対象
+```
 
-Warning System
-警報条件
+つまり、
 
-以下の条件で警報動作を行います。
+* 新しいEEW
+* 続報
+* 警報（isWarn）
 
-updated && isWarn
+この3つの条件を満たした場合のみ警報します。
 
-条件：
+---
 
-新しいEEW情報
-または速報更新
-警報状態
+# LED
 
-の場合にLED・ブザーを動作させます。
+GPIO16へ接続したLEDを点灯します。
 
-Buzzer Operation
+警報終了後は消灯します。
 
-警報音は周波数スイープ方式です。
+---
 
-動作：
+# Passive Buzzer
 
+GPIO17へ接続したパッシブブザーを使用します。
+
+現在の警報音は周波数スイープ方式です。
+
+```text id="n3vwsd"
 1000Hz
- ↓
+↓
+
 2200Hz
- ↓
+↓
+
 1000Hz
+```
 
 これを3回繰り返します。
 
-LED Operation
+---
 
-使用GPIO：
+# CANCEL Report
 
-GPIO16
+キャンセル報を受信した場合、
 
-状態：
+表示
 
-状態	LED
-通常待機	消灯
-EEW警報	点灯
-PLUM Processing
-
-PLUM法による情報を検出した場合：
-
-表示：
-
-PLUM#番号
-
-になります。
-
-通常のEEW情報と区別することで、
-どの方式による速報なのか確認できます。
-
-FINAL Processing
-
-最終報を受信した場合：
-
-表示：
-
-FINAL#番号
-
-になります。
-
-最終的な速報更新として扱います。
-
-Cancel Processing
-
-EEW発表後、取り消し情報を受信する場合があります。
-
-キャンセル検出：
-
-isCancel = true
-
-の場合：
-
-表示：
-
+```text id="k7m8lr"
 CANCEL
-Cancel時の処理
+```
 
-実行内容：
+へ切り替わります。
 
-ブザー停止
-LED消灯
-EventID初期化
-Serial初期化
+同時に
 
-その後、次のEEW情報を待機します。
+* LED消灯
+* ブザー停止
+* EventIDリセット
+* Serialリセット
 
-No Duplicate Alert
+を実行します。
 
-同じ速報を何度も警報しないように、
-更新状態を確認しています。
-
-管理：
-
-lastEventID
-lastSerial
-
-により、
-
-同じ地震
-同じ速報番号
-
-の重複処理を防止します。
-# GS Code System
-
-本機では震源名を3文字のGSコードへ変換して表示します。
-
-OLEDは表示できる文字数に制限があるため、
-長い震源名を短いコードへ変換することで、
-限られた画面内でも確認しやすくしています。
+キャンセル画面は一定時間表示された後、待機状態へ戻ります。
 
 ---
 
-# GS Code Processing
+# Communication Error
 
-処理の流れ：
+Wi-Fiへ接続できない場合は、
 
+```text id="7vutbi"
+NO WIFI
+```
 
-EEWから震源名取得
-|
-↓
-GSコードテーブル検索
-|
-↓
-3文字コード表示
+を表示します。
 
+Wi-Fi接続が回復すると、自動的にEEW情報の取得を再開します。
+
+---
+# Display
+
+本機では128×64 SSD1306 OLEDディスプレイへ地震情報を表示します。
+
+画面は必要な情報だけを見やすく表示することを目的として設計しています。
 
 ---
 
-例：
+# Normal Screen
 
+通常時
 
-岩手県沖
+```text
+WiFi OK
 
-↓
+Waiting...
+```
 
-IWO
+この画面が表示されている間も、約1秒ごとにEEW情報を取得しています。
 
+---
 
-表示例：
+# EEW Screen
 
+EEW受信時
+
+```text
+EEW!#12
 
 6+
-
-IWO M6.9
-
-
----
-
-# GS Code Table
-
-本機では全国の震源地域を登録しています。
-
-例：
-
-|震源名|GSコード|
-|-|-|
-|根室半島南東沖|NMU|
-|北海道東方沖|HEO|
-|釧路沖|KRO|
-|十勝沖|TOK|
-|浦河沖|URK|
-|青森県東方沖|AOE|
-|岩手県沖|IWO|
-|三陸沖|SAN|
-|宮城県沖|MYO|
-|福島県沖|FKS|
-|茨城県沖|IBR|
-|東京湾|TYO|
-|東京都23区|T23|
-|大阪府北部|OSK|
-|奈良県|NAR|
-|兵庫県南東部|HSN|
-|日向灘|HNG|
-|沖縄本島近海|OKA|
+IWO     M6.9
+```
 
 ---
 
-登録されていない震源の場合：
+# Screen Layout
 
+```text
+┌──────────────────────┐
+│ EEW!#12              │
+│                      │
+│ 6+                   │
+│                      │
+│          IWO         │
+│          M6.9        │
+└──────────────────────┘
+```
 
-???
+---
 
+# Display Items
+
+## First Line
+
+速報種類と速報番号を表示します。
+
+表示例
+
+```text
+EEW!#15
+PLUM#8
+FINAL#23
+```
+
+---
+
+## Maximum Forecast Intensity
+
+画面中央には最大予測震度を大きく表示します。
+
+変換内容
+
+| JMA | Display |
+| --- | ------- |
+| 1   | 1       |
+| 2   | 2       |
+| 3   | 3       |
+| 4   | 4       |
+| 5弱  | 5-      |
+| 5強  | 5+      |
+| 6弱  | 6-      |
+| 6強  | 6+      |
+| 7   | 7       |
+| 不明  | ?       |
+
+---
+
+## Magnitude
+
+右下へマグニチュードを表示します。
+
+例
+
+```text
+M6.8
+```
+
+取得できない場合
+
+```text
+M?
+```
 
 を表示します。
 
 ---
 
-# GS Code Management
+# GS Code System
 
-GSコードはプログラム内のテーブルで管理しています。
+OLEDは表示できる文字数が限られています。
 
-形式：
+そのため本機では震源名を3文字のGSコードへ変換して表示します。
 
-```cpp
-{
- "震源名",
- "コード"
-}
+これにより、
 
-例：
+* 画面が見やすい
+* 長い震源名でも表示可能
+* 速報を素早く確認できる
 
-{
- "岩手県沖",
- "IWO"
-}
+という利点があります。
 
-新しい震源を追加する場合は、
-このテーブルへ追加します。
+---
 
-Operation Example
-通常待機
-WiFi OK
+# GS Code Conversion
 
-Waiting...
-EEW受信
-EEW!#25
+処理
 
+```text
+Hypocenter
+      │
+      ▼
+GS Table
+      │
+      ▼
+3 Letter Code
+```
+
+例
+
+```text
+岩手県沖
+
+↓
+
+IWO
+```
+
+表示
+
+```text
 6+
+
 IWO     M6.9
+```
 
-動作：
+---
 
-EEWデータ取得
-新規情報判定
-OLED更新
-警報判定
-LED・ブザー動作
-続報受信
+# GS Code Examples
 
-例：
+| Hypocenter | GS  |
+| ---------- | --- |
+| 根室半島南東沖    | NMU |
+| 北海道東方沖     | HEO |
+| 釧路沖        | KRO |
+| 十勝沖        | TOK |
+| 三陸沖        | SAN |
+| 岩手県沖       | IWO |
+| 宮城県沖       | MYO |
+| 福島県沖       | FKS |
+| 茨城県沖       | IBR |
+| 東京湾        | TYO |
+| 東京都23区     | T23 |
+| 大阪府北部      | OSK |
+| 奈良県        | NAR |
+| 兵庫県南東部     | HSN |
+| 日向灘        | HNG |
+| 沖縄本島近海     | OKA |
 
-EEW!#10
- ↓
-EEW!#11
- ↓
-FINAL#12
+全国の震源地域に対応しています。
 
-Serial番号の更新に合わせて表示を更新します。
+登録されていない震源名の場合は
 
-キャンセル受信
+```text
+???
+```
 
-表示：
+を表示します。
 
+---
+
+# CANCEL Display
+
+キャンセル報を受信すると、
+
+```text
 CANCEL
+```
 
-動作：
+を表示します。
 
-警報停止
-情報リセット
-次のEEW待機
-Current Build Status
+このとき
 
-現在の構成：
+* LED消灯
+* ブザー停止
+* EventIDリセット
+* Serialリセット
 
-ESP32-WROOM系開発ボード
-OLED表示
-ブレッドボード試作
-Wi-Fi常時接続
-EEW自動受信
+を実行します。
 
-として動作しています。
+その後もつぎのEEW受信までキャンセル画面を表示し続けます。
 
-Future Plans
-Ver 1.1
+これは、ユーザーが後からキャンセル報を確認できるようにするためです。
 
-予定：
+---
 
-津波情報表示
-表示情報追加
-警報機能改善
-Ver 2.0
+# Current Version
 
-予定：
+現在の仕様
 
-カラーLCD化
-詳細地震情報表示
-ケース製作
-ユニバーサル基板化
-Notes
+* ESP32によるWi-Fi通信
+* 約1秒間隔でEEW取得
+* OLED表示
+* GSコード表示
+* LED警報
+* パッシブブザー警報
+* PLUM対応
+* FINAL対応
+* CANCEL対応
+* EventID・Serial管理
+* 全国震源GSコード対応
 
-本機は個人製作の緊急地震速報モニターです。
+---
 
-以下の理由により、
-情報の遅延や取得失敗が発生する場合があります。
+# Future Plans
 
-Wi-Fi通信状態
-API提供状態
-ESP32の動作状態
+今後追加を予定している機能
 
-また、本機は防災用公式端末ではありません。
+* カラーLCD対応
+* 津波情報表示
+* 詳細震源情報表示
+* Wi-Fi自動復旧
+* 通信安定性向上
+* ケース製作
+* ユニバーサル基板化
 
-防災判断には気象庁など公式情報をご利用ください。
+---
+# Known Issues
 
-License
+現在確認されている問題です。
 
-MIT License
+* 長時間連続運転時に、まれにEEW情報の取得が遅れる場合があります。
+* 通信環境やAPIの応答状況によって、表示が遅延する場合があります。
+* Wi-Fi切断時は自動で再接続を試みますが、状況によってはESP32の再起動が必要になる場合があります。
 
-Author
+今後のアップデートで通信処理や安定性の改善を予定しています。
 
-de101208s-crypto
+---
+
+# Changelog
+
+## Version 1.0
+
+初回公開版
+
+### Functions
+
+* ESP32によるWi-Fi通信
+* Wolfx JMA EEW API対応
+* SSD1306 OLED表示
+* 約1秒間隔でEEW取得
+* 最大予測震度表示
+* マグニチュード表示
+* GSコード表示
+* LED警報
+* パッシブブザー警報
+* EventID・Serial管理
+* PLUM対応
+* FINAL対応
+* CANCEL対応
+* 全国震源GSコード対応
+
+---
+
+# License
+
+このプロジェクトはMIT Licenseの下で公開しています。
+
+詳しくはリポジトリ内のLICENSEファイルをご確認ください。
+
+---
+
+# Disclaimer
+
+本ソフトウェアおよび回路は個人製作のプロジェクトです。
+
+本プロジェクトを利用したことによって生じたいかなる損害についても、作者は責任を負いません。
+
+本機は防災・学習・電子工作を目的として公開しています。
+
+防災判断には必ず気象庁などの公式情報をご利用ください。
+
+---
+
+# Credits
+
+## Data Source
+
+* Wolfx JMA EEW API
+
+## Libraries
+
+* WiFi
+* WiFiClientSecure
+* HTTPClient
+* Wire
+* Adafruit GFX Library
+* Adafruit SSD1306
+* ArduinoJson
+
+すべてのライブラリ開発者の皆様に感謝いたします。
+
+---
+
+# Contributing
+
+バグ報告や改善案、プルリクエストは歓迎します。
+
+IssueやPull Requestからお気軽にご連絡ください。
+
+---
+
+# Screenshots
+
+完成写真や配線写真を追加する場合は、以下のような構成がおすすめです。
+
+```text
+images/
+├── receiver.jpg
+├── wiring.jpg
+├── wiring.png
+└── display.jpg
+```
+
+READMEから表示する例
+
+```md
+## Receiver
+
+![Receiver](images/receiver.jpg)
+
+## Wiring
+
+![Wiring](images/wiring.png)
+
+## Display
+
+![Display](images/display.jpg)
+```
+
+---
+
+# Author
+
+**GitHub:** de101208s-crypto
+
+Project Name
+
+**ESP32 EEW Receiver**
+
+Version
+
+**v1.0**
+
+Developed with ESP32, Arduino IDE / Arduino Cloud, SSD1306 OLED Display and the Wolfx JMA EEW API.
+
+Thank you for checking out this project! 📡
