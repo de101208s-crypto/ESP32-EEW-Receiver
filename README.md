@@ -1059,36 +1059,6 @@ IssueやPull Requestからお気軽にご連絡ください。
 
 ---
 
-# Screenshots
-
-完成写真や配線写真を追加する場合は、以下のような構成がおすすめです。
-
-```text
-images/
-├── receiver.jpg
-├── wiring.jpg
-├── wiring.png
-└── display.jpg
-```
-
-READMEから表示する例
-
-```md
-## Receiver
-
-![Receiver](images/receiver.jpg)
-
-## Wiring
-
-![Wiring](images/wiring.png)
-
-## Display
-
-![Display](images/display.jpg)
-```
-
----
-
 # Author
 
 **GitHub:** de101208s-crypto
