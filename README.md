@@ -1029,6 +1029,11 @@ CANCEL
 
 防災判断には必ず気象庁などの公式情報をご利用ください。
 
+本プロジェクトではWolfx ProjectのJMA EEW APIを利用しています。
+
+地震データはWolfx Projectより提供されています。
+APIを利用する際はWolfx Projectの利用規約に従ってください。
+
 ---
 
 # Credits
